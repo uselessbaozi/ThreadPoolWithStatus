@@ -16,6 +16,9 @@ void ThreadPool::TaskBase::SetTaskStatus(TaskStatus status)
 
 ThreadPool::Pool::Pool(size_t size): stop(false)
 {
+	if (ThreadPool::Pool::GetPool())
+		throw std::runtime_error("ThreadPool::Pool::GetPool() must be called before creating a task");
+	thisPool = this;
 	for (auto i = 0u; i < size; ++i)
 	{
 		workers.emplace_back([this] {
@@ -42,4 +45,11 @@ ThreadPool::Pool::~Pool()
 	cv.notify_all();
 	for (auto& worker : workers)
 		worker.join();
+}
+
+ThreadPool::Pool* ThreadPool::Pool::thisPool = nullptr;
+
+ThreadPool::Pool* ThreadPool::Pool::GetPool()
+{
+	return thisPool;
 }

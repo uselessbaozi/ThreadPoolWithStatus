@@ -59,10 +59,15 @@ namespace ThreadPool
 		Pool (size_t size = 4);
 		~Pool();
 
+	public:
+		static Pool* GetPool();
+
 		template<class Func, class... Args>
 		auto AddTask(Func&& func, Args&&... args) -> std::shared_ptr<Task<decltype(func(args...))>>;
 
 	private:
+		static Pool* thisPool;
+
 		std::vector<std::thread> workers;
 		std::queue<std::function<void()>> tasks;
 		std::mutex queueLock;
