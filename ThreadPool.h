@@ -24,7 +24,7 @@ namespace ThreadPool
 	{
 	public:
 		TaskBase();
-		TaskStatus GetTaskStatus() const;
+		virtual TaskStatus GetTaskStatus() const;
 		void SetTaskStatus(TaskStatus status);
 
 	private:
@@ -35,8 +35,7 @@ namespace ThreadPool
 	{
 	public:
 		Task(std::future<RetType> res);
-
-	public:
+		TaskStatus GetTaskStatus() const override;
 		RetType GetResult();
 
 	private:
@@ -47,8 +46,7 @@ namespace ThreadPool
 	{
 	public:
 		Task(std::future<void> res);
-
-	public:
+		TaskStatus GetTaskStatus() const override;
 		void GetResult();
 
 	private:
@@ -79,20 +77,20 @@ inline ThreadPool::Task<RetType>::Task(std::future<RetType> res) :res(std::move(
 }
 
 template<class RetType>
+inline ThreadPool::TaskStatus ThreadPool::Task<RetType>::GetTaskStatus() const
+{
+	auto r(this->res.valid());
+	if (r)
+	{
+		return ThreadPool::TaskStatus::FINISHED;
+	}
+	return TaskBase::GetTaskStatus();
+}
+
+template<class RetType>
 inline RetType ThreadPool::Task<RetType>::GetResult()
 {
-	switch (GetTaskStatus())
-	{
-	case ThreadPool::TaskStatus::READY:
-		throw std::runtime_error("Task is not running yet.");
-		break;
-	case ThreadPool::TaskStatus::RUNNING:
-		throw std::runtime_error("Task is running.");
-		break;
-	case ThreadPool::TaskStatus::FINISHED:
-	default:
-		return this->res.get();
-	}
+	return this->res.get();
 }
 
 inline ThreadPool::Task<void>::Task(std::future<void> res) :res(std::move(res)), TaskBase()
@@ -101,18 +99,7 @@ inline ThreadPool::Task<void>::Task(std::future<void> res) :res(std::move(res)),
 
 inline void ThreadPool::Task<void>::GetResult()
 {
-	switch (GetTaskStatus())
-	{
-	case ThreadPool::TaskStatus::READY:
-		throw std::runtime_error("Task is not running yet.");
-		break;
-	case ThreadPool::TaskStatus::RUNNING:
-		throw std::runtime_error("Task is running.");
-		break;
-	case ThreadPool::TaskStatus::FINISHED:
-	default:
-		return;
-	}
+	return this->res.get();
 }
 
 template<class Func, class ...Args>
