@@ -14,6 +14,7 @@ int main()
 	{
 		voidResults.push_back(std::move(pool.AddTask([i]() {cout << "Count: " << i << endl; })));
 	}
+	pool.WaitAll();
 	//this_thread::sleep_for(chrono::seconds(5));
 	for (auto& r : voidResults)
 	{
@@ -27,6 +28,7 @@ int main()
 	{
 		intResults.push_back(std::move(pool.AddTask([i]() {cout << "Count: " << i << endl; return i; })));
 	}
+	pool.WaitAll();
 	//this_thread::sleep_for(chrono::seconds(5));
 	for (auto& r : intResults)
 	{

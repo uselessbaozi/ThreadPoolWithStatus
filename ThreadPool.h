@@ -1,14 +1,15 @@
 #pragma once
 #include <atomic>
+#include <barrier>
 #include <condition_variable>
 #include <functional>
 #include <future>
+#include <memory>
 #include <mutex>
 #include <queue>
 #include <thread>
 #include <type_traits>
 #include <vector>
-#include <memory>
 
 // Ïß³Ì³Ø
 namespace ThreadPool
@@ -28,8 +29,10 @@ namespace ThreadPool
 
 	protected:
 		TaskBase();
+
 	public:
 		virtual TaskStatus GetTaskStatus() const;
+
 	protected:
 		void SetTaskStatus(TaskStatus status);
 
@@ -40,12 +43,13 @@ namespace ThreadPool
 	class Task :public TaskBase
 	{
 		friend class Pool;
-	public:
-		static std::shared_ptr<Task<RetType>> CreateTask(std::future<RetType> res);
 
 	protected:
 		Task(std::future<RetType> res);
+
 	public:
+		static std::shared_ptr<Task<RetType>> CreateTask(std::future<RetType> res);
+
 		TaskStatus GetTaskStatus() const override;
 		RetType GetResult();
 
@@ -56,14 +60,15 @@ namespace ThreadPool
 	class Task<void> :public TaskBase
 	{
 		friend class Pool;
-	public:
-		static std::shared_ptr<Task<void>> CreateTask(std::future<void> res);
 
 	protected:
 		Task(std::future<void> res);
+
 	public:
 		TaskStatus GetTaskStatus() const override;
 		void GetResult();
+
+		static std::shared_ptr<Task<void>> CreateTask(std::future<void> res);
 
 	private:
 		std::future<void> res;
@@ -76,10 +81,13 @@ namespace ThreadPool
 		~Pool();
 
 	public:
-		static Pool* GetPool();
-
+		static Pool* GetPool() noexcept;
 		template<class Func, class... Args>
 		auto AddTask(Func&& func, Args&&... args) -> std::shared_ptr<Task<decltype(func(args...))>>;
+		void WaitAll();
+
+	private:
+		static void SetWaitStateFalse() noexcept;
 
 	private:
 		static Pool* thisPool;
@@ -88,7 +96,9 @@ namespace ThreadPool
 		std::queue<std::function<void()>> tasks;
 		std::mutex queueLock;
 		std::condition_variable cv;
-		std::atomic<bool> stop;
+		std::barrier<void(*)()noexcept> waitBarrier;
+		bool waitState;
+		bool stopState;
 	};
 }
 
@@ -156,7 +166,7 @@ inline auto ThreadPool::Pool::AddTask(Func&& func, Args&& ...args) -> std::share
 	);
 	auto res(ThreadPool::Task<RetType>::CreateTask(task->get_future()));
 
-	if (stop.load())
+	if (stopState)
 	{
 		throw std::runtime_error("Pool is stopped.");
 	}
