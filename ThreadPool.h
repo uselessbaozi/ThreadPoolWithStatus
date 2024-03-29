@@ -20,11 +20,17 @@ namespace ThreadPool
 		FINISHED
 	};
 
+	class Pool;
+
 	class TaskBase
 	{
-	public:
+		friend class Pool;
+
+	protected:
 		TaskBase();
+	public:
 		virtual TaskStatus GetTaskStatus() const;
+	protected:
 		void SetTaskStatus(TaskStatus status);
 
 	private:
@@ -33,8 +39,13 @@ namespace ThreadPool
 	template<class RetType>
 	class Task :public TaskBase
 	{
+		friend class Pool;
 	public:
+		static std::shared_ptr<Task<RetType>> CreateTask(std::future<RetType> res);
+
+	protected:
 		Task(std::future<RetType> res);
+	public:
 		TaskStatus GetTaskStatus() const override;
 		RetType GetResult();
 
@@ -44,8 +55,13 @@ namespace ThreadPool
 	template<>
 	class Task<void> :public TaskBase
 	{
+		friend class Pool;
 	public:
+		static std::shared_ptr<Task<void>> CreateTask(std::future<void> res);
+
+	protected:
 		Task(std::future<void> res);
+	public:
 		TaskStatus GetTaskStatus() const override;
 		void GetResult();
 
@@ -77,6 +93,12 @@ namespace ThreadPool
 }
 
 template<class RetType>
+inline std::shared_ptr<ThreadPool::Task<RetType>> ThreadPool::Task<RetType>::CreateTask(std::future<RetType> res)
+{
+	return std::shared_ptr<ThreadPool::Task<RetType>>(new ThreadPool::Task<RetType>(std::move(res)));
+}
+
+template<class RetType>
 inline ThreadPool::Task<RetType>::Task(std::future<RetType> res) :res(std::move(res)), TaskBase()
 {
 }
@@ -98,8 +120,23 @@ inline RetType ThreadPool::Task<RetType>::GetResult()
 	return this->res.get();
 }
 
+inline std::shared_ptr<ThreadPool::Task<void>> ThreadPool::Task<void>::CreateTask(std::future<void> res)
+{
+	return std::shared_ptr<ThreadPool::Task<void>>(new ThreadPool::Task<void>(std::move(res)));
+}
+
 inline ThreadPool::Task<void>::Task(std::future<void> res) :res(std::move(res)), TaskBase()
 {
+}
+
+inline ThreadPool::TaskStatus ThreadPool::Task<void>::GetTaskStatus() const
+{
+	auto r(this->res.valid());
+	if (r)
+	{
+		return ThreadPool::TaskStatus::FINISHED;
+	}
+	return TaskBase::GetTaskStatus();
 }
 
 inline void ThreadPool::Task<void>::GetResult()
@@ -117,7 +154,7 @@ inline auto ThreadPool::Pool::AddTask(Func&& func, Args&& ...args) -> std::share
 			std::bind(std::forward<Func>(func), std::forward<Args>(args)...)
 		)
 	);
-	auto res(std::make_shared<ThreadPool::Task<RetType>>(task->get_future()));
+	auto res(ThreadPool::Task<RetType>::CreateTask(task->get_future()));
 
 	if (stop.load())
 	{
