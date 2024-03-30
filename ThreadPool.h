@@ -48,10 +48,11 @@ namespace ThreadPool
 		Task(std::future<RetType> res);
 
 	public:
-		static std::shared_ptr<Task<RetType>> CreateTask(std::future<RetType> res);
-
 		TaskStatus GetTaskStatus() const override;
 		RetType GetResult();
+
+	private:
+		static std::shared_ptr<Task<RetType>> CreateTask(std::future<RetType> res);
 
 	private:
 		std::future<RetType> res;
@@ -68,6 +69,7 @@ namespace ThreadPool
 		TaskStatus GetTaskStatus() const override;
 		void GetResult();
 
+	private:
 		static std::shared_ptr<Task<void>> CreateTask(std::future<void> res);
 
 	private:
