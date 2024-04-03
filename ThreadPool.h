@@ -80,6 +80,10 @@ namespace ThreadPool
 	{
 	public:
 		Pool (size_t size = 4);
+		Pool (const Pool&) = delete;
+		Pool& operator=(const Pool&) = delete;
+		Pool (Pool&&) = delete;
+		Pool& operator=(Pool&&) = delete;
 		~Pool();
 
 	public:
@@ -173,20 +177,6 @@ inline auto ThreadPool::Pool::AddTask(Func&& func, Args&& ...args) -> std::share
 	auto res(ThreadPool::Task<RetType>::CreateTask(task->get_future()));
 
 	AddTaskToQueue(task, res);
-	/*if (stopState)
-	{
-		throw std::runtime_error("Pool is stopped.");
-	}
-
-	{
-		std::lock_guard<std::mutex> lock(queueLock);
-		tasks.emplace([task, res]() {
-			res->SetTaskStatus(ThreadPool::TaskStatus::RUNNING);
-			(*task)();
-			res->SetTaskStatus(ThreadPool::TaskStatus::FINISHED);
-			});
-	}
-	cv.notify_one();*/
 
 	return res;
 }
@@ -204,20 +194,6 @@ inline auto ThreadPool::Pool::AddTask(Func&& func, Instance&& instance, Args && 
 	auto res(ThreadPool::Task<RetType>::CreateTask(task->get_future()));
 
 	AddTaskToQueue(task, res);
-	//if (stopState)
-	//{
-	//	throw std::runtime_error("Pool is stopped.");
-	//}
-
-	//{
-	//	std::lock_guard<std::mutex> lock(queueLock);
-	//	tasks.emplace([task, res]() {
-	//		res->SetTaskStatus(ThreadPool::TaskStatus::RUNNING);
-	//		(*task)();
-	//		res->SetTaskStatus(ThreadPool::TaskStatus::FINISHED);
-	//		});
-	//}
-	//cv.notify_one();
 
 	return res;
 }
