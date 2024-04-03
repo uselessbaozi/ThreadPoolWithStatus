@@ -86,10 +86,14 @@ namespace ThreadPool
 		static Pool* GetPool() noexcept;
 		template<class Func, class... Args>
 		auto AddTask(Func&& func, Args&&... args) -> std::shared_ptr<Task<decltype(func(args...))>>;
+		template<class Func, class Instance, class... Args>
+		auto AddTask(Func&& func, Instance&& instance, Args&&... args) -> std::shared_ptr<Task<decltype((instance->*func)(args...))>>;
 		void WaitAll();
 
 	private:
 		static void SetWaitStateFalse() noexcept;
+		template<class T, class R>
+		void AddTaskToQueue(T& t, R& r);
 
 	private:
 		static Pool* thisPool;
@@ -168,7 +172,8 @@ inline auto ThreadPool::Pool::AddTask(Func&& func, Args&& ...args) -> std::share
 	);
 	auto res(ThreadPool::Task<RetType>::CreateTask(task->get_future()));
 
-	if (stopState)
+	AddTaskToQueue(task, res);
+	/*if (stopState)
 	{
 		throw std::runtime_error("Pool is stopped.");
 	}
@@ -181,7 +186,57 @@ inline auto ThreadPool::Pool::AddTask(Func&& func, Args&& ...args) -> std::share
 			res->SetTaskStatus(ThreadPool::TaskStatus::FINISHED);
 			});
 	}
-	cv.notify_one();
+	cv.notify_one();*/
 
 	return res;
+}
+
+template<class Func, class Instance, class ...Args>
+inline auto ThreadPool::Pool::AddTask(Func&& func, Instance&& instance, Args && ...args) -> std::shared_ptr<Task<decltype((instance->*func)(args ...))>>
+{
+	using RetType = decltype((instance->*func)(args...));
+
+	auto task(
+		std::make_shared<std::packaged_task<RetType()>>(
+			std::bind(func, instance, std::forward<Args>(args)...)
+		)
+	);
+	auto res(ThreadPool::Task<RetType>::CreateTask(task->get_future()));
+
+	AddTaskToQueue(task, res);
+	//if (stopState)
+	//{
+	//	throw std::runtime_error("Pool is stopped.");
+	//}
+
+	//{
+	//	std::lock_guard<std::mutex> lock(queueLock);
+	//	tasks.emplace([task, res]() {
+	//		res->SetTaskStatus(ThreadPool::TaskStatus::RUNNING);
+	//		(*task)();
+	//		res->SetTaskStatus(ThreadPool::TaskStatus::FINISHED);
+	//		});
+	//}
+	//cv.notify_one();
+
+	return res;
+}
+
+template<class T, class R>
+inline void ThreadPool::Pool::AddTaskToQueue(T& t, R& r)
+{
+	if (stopState)
+	{
+		throw std::runtime_error("Pool is stopped.");
+	}
+
+	{
+		std::lock_guard<std::mutex> lock(queueLock);
+		tasks.emplace([t, r]() {
+			r->SetTaskStatus(ThreadPool::TaskStatus::RUNNING);
+			(*t)();
+			r->SetTaskStatus(ThreadPool::TaskStatus::FINISHED);
+			});
+	}
+	cv.notify_one();
 }

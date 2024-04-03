@@ -5,6 +5,19 @@
 #include <memory>
 using namespace std;
 
+class test
+{
+public:
+	test(int i) : m_i(i) {}
+	void ttt() const
+	{
+		cout << "Count: " << m_i << endl;
+		//return m_i;
+	}
+private:
+	int m_i;
+};
+
 int main()
 {
 	ThreadPool::Pool pool(16);
@@ -36,6 +49,10 @@ int main()
 		cout << r->GetResult() << endl;
 	}
 	std::cout << std::endl;
+
+	auto t = test(10);
+	auto result = pool.AddTask(&test::ttt, &t);
+	pool.WaitAll();
 
 	return 0;
 }
